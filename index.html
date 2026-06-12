@@ -2,205 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chinese Study Sandbox</title>
+    <title>Chinese Study Tool</title>
     <style>
-        /* Modern Dark Mode styling */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #121212;
-            color: #e0e0e0;
-            padding: 20px;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        h2, h3 {
-            color: #ffffff;
-            margin-bottom: 10px;
-        }
-
-        .container {
-            max-width: 800px;
-            width: 100%;
-        }
-
-        /* Rich text paste zone */
-        #paste-zone {
-            width: 100%;
-            height: 100px;
-            border: 2px dashed #444;
-            border-radius: 8px;
-            background: #1e1e1e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #888;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-bottom: 25px;
-            box-sizing: border-box;
-            transition: border-color 0.3s, background-color 0.3s;
-        }
-
-        #paste-zone:focus {
-            border-color: #00adb5;
-            background-color: #252525;
-            color: #fff;
-            outline: none;
-        }
-
-        /* Reader Area */
-        #interactive-display {
-            background-color: #1e1e1e;
-            padding: 25px;
-            border-radius: 8px;
-            min-height: 80px;
-            line-height: 2;
-            font-size: 1.8rem;
-            text-align: center;
-            word-wrap: break-word;
-            border: 1px solid #2d2d2d;
-        }
-
-        /* Clickable interactive words */
-        .study-word {
-            cursor: pointer;
-            padding: 2px 6px;
-            border-radius: 4px;
-            transition: background-color 0.2s, transform 0.1s;
-            display: inline-block;
-            user-select: none;
-        }
-
-        .study-word:hover {
-            background-color: #2a2a2a;
-            transform: scale(1.05);
-        }
-
-        .study-word:active {
-            transform: scale(0.95);
-        }
-
-        .instructions {
-            font-size: 0.9rem;
-            color: #666;
-            text-align: center;
-            margin-top: 10px;
-        }
+        body { background-color: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
+        #input-area { width: 100%; height: 120px; background: #1e1e1e; color: white; border: 1px solid #444; padding: 10px; border-radius: 8px; }
+        .word-block { display: inline-block; padding: 5px; margin: 2px; border: 1px solid #333; cursor: pointer; border-radius: 4px; background: #252525; min-width: 40px; text-align: center; }
+        #display { margin-top: 20px; font-size: 1.5rem; }
     </style>
 </head>
 <body>
-
-    <div class="container">
-        <h2>Chinese Study Reader</h2>
-        
-        <div id="paste-zone" contenteditable="true">
-            Click here and PASTE your colored row pairs
-        </div>
-
-        <h3>Interactive Study View</h3>
-        <div id="interactive-display">
-            Your interactive sentence elements will load here...
-        </div>
-        <div class="instructions">Tap any colored word to cycle: Character → Pinyin → Translation</div>
-    </div>
+    <h2>Paste your 3 lines:</h2>
+    <textarea id="input-area" placeholder="Paste Chinese, Pinyin, and English lines here..."></textarea>
+    <button onclick="processText()" style="margin-top:10px; padding:10px;">Build Study Set</button>
+    <div id="display"></div>
 
     <script>
-        const pasteZone = document.getElementById('paste-zone');
-        const display = document.getElementById('interactive-display');
-
-        pasteZone.addEventListener('paste', function(e) {
-            e.preventDefault();
+        function processText() {
+            const lines = document.getElementById('input-area').value.split('\n').filter(l => l.trim() !== "");
+            if (lines.length < 3) { alert("Please paste at least 3 lines!"); return; }
             
-            // Grab the raw rich-text HTML containing color metadata from the clipboard
-            const htmlData = e.clipboardData.getData('text/html');
+            const chinese = lines[0].split(/\s+/);
+            const pinyin = lines[1].split(/\s+/);
+            const meaning = lines[2].split(/\s+/);
             
-            if (!htmlData) {
-                display.innerHTML = "<span style='color:red; font-size:1.2rem;'>Error: No color data detected. Make sure to copy colored text!</span>";
-                return;
-            }
-
-            // Create an off-screen parsing element to handle raw incoming nodes cleanly
-            const parser = document.createElement('div');
-            parser.innerHTML = htmlData;
-
-            // Extract all stylized child fragments (spans or fonts generated by Samsung Notes)
-            const styledElements = parser.querySelectorAll('span[style*="color"], font[color]');
+            const display = document.getElementById('display');
+            display.innerHTML = "";
             
-            if (styledElements.length < 3) {
-                display.innerHTML = "<span style='color:orange; font-size:1.2rem;'>Paste detected, but couldn't group Character/Pinyin/Translation layers reliably. Check color pairings!</span>";
-                return;
-            }
-
-            // Step 1: Separate items based on unique colors found in the clip payload
-            const colorGroups = {};
-            
-            styledElements.forEach(el => {
-                // Read color from either inline CSS styles or legacy font tags
-                let color = el.style.color || el.getAttribute('color');
-                if (!color) return;
+            for (let i = 0; i < chinese.length; i++) {
+                const block = document.createElement('div');
+                block.className = 'word-block';
+                block.dataset.state = 0;
+                block.textContent = chinese[i];
                 
-                // Normalize naming configurations to group matches evenly
-                color = color.toLowerCase().replace(/\s+/g, '');
-                const cleanText = el.textContent.trim();
-                
-                if (cleanText) {
-                    if (!colorGroups[color]) {
-                        colorGroups[color] = [];
-                    }
-                    colorGroups[color].push({
-                        text: cleanText,
-                        elementColor: color
-                    });
-                }
-            });
-
-            // Step 2: Formulate structured triplets (Char, Pinyin, Trans) grouped by shared colors
-            display.innerHTML = ''; // Clear previous view
-            
-            Object.keys(colorGroups).forEach(colorKey => {
-                const groupItems = colorGroups[colorKey];
-                
-                // We strictly expect 3 items matching per color to build out the structural states
-                if (groupItems.length >= 3) {
-                    const characterData = groupItems[0].text;
-                    const pinyinData = groupItems[1].text;
-                    const translationData = groupItems[2].text;
-
-                    // Create the interface item anchor
-                    const wordSpan = document.createElement('span');
-                    wordSpan.className = 'study-word';
-                    wordSpan.style.color = colorKey; // Match original Note color
-                    wordSpan.textContent = characterData + " "; // Render base character default
-                    
-                    // State manager: 0 = Character, 1 = Pinyin, 2 = Translation
-                    let currentState = 0; 
-
-                    wordSpan.addEventListener('click', function() {
-                        currentState = (currentState + 1) % 3; // Loop between 0, 1, 2
-                        
-                        if (currentState === 0) {
-                            wordSpan.textContent = characterData + " ";
-                        } else if (currentState === 1) {
-                            wordSpan.textContent = pinyinData + " ";
-                        } else if (currentState === 2) {
-                            wordSpan.textContent = translationData + " ";
-                        }
-                    });
-
-                    display.appendChild(wordSpan);
-                }
-            });
-
-            if (display.children.length === 0) {
-                display.innerHTML = "<span style='color:orange; font-size:1.2rem;'>Couldn't group colored segments. Make sure you copy exactly three items (Char, Pinyin, Meaning) per color.</span>";
+                block.onclick = () => {
+                    block.dataset.state = (parseInt(block.dataset.state) + 1) % 3;
+                    const s = block.dataset.state;
+                    block.textContent = (s == 0) ? chinese[i] : (s == 1) ? (pinyin[i] || "---") : (meaning[i] || "---");
+                };
+                display.appendChild(block);
             }
-
-            pasteZone.innerText = "Pasted successfully! Ready for next.";
-        });
+        }
     </script>
 </body>
 </html>
