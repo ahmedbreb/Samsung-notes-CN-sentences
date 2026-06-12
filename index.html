@@ -3,45 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Chinese Studio Sandbox</title>
+    <title>AI Chinese Pattern Study App</title>
     <style>
+        /* Modern Dark Mode Styling */
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
             background-color: #121212;
             color: #e0e0e0;
             padding: 20px;
+            margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        .container { max-width: 800px; width: 100%; }
-        h2, h3 { text-align: center; color: #fff; margin-bottom: 5px; }
-        
-        .setup-box {
-            background: #1e1e1e;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #2d2d2d;
-            margin-bottom: 25px;
+
+        .container {
+            max-width: 700px;
+            width: 100%;
         }
-        
+
+        h2 { text-align: center; color: #ffffff; margin-bottom: 20px; }
+
+        /* Pages */
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* Input Screen Layout */
         textarea {
             width: 100%;
-            height: 100px;
-            background: #252525;
+            height: 200px;
+            background: #1e1e1e;
             color: #fff;
-            border: 1px solid #444;
-            padding: 12px;
-            border-radius: 8px;
+            border: 2px dashed #444;
+            padding: 15px;
+            border-radius: 10px;
             box-sizing: border-box;
             font-size: 1rem;
             resize: none;
-            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        textarea:focus {
+            border-color: #00adb5;
+            outline: none;
         }
 
-        button.main-btn {
+        /* Buttons */
+        button {
             width: 100%;
             padding: 14px;
+            margin-top: 15px;
             background-color: #00adb5;
             color: #fff;
             border: none;
@@ -51,220 +61,158 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        button.main-btn:hover { background-color: #008c95; }
+        button:hover { background-color: #008c95; }
 
-        #workspace {
+        button.back-btn {
+            background-color: #333;
+            border: 1px solid #444;
+            margin-top: 0;
+            margin-bottom: 20px;
+            width: auto;
+            padding: 8px 16px;
+            font-size: 0.95rem;
+        }
+        button.back-btn:hover { background-color: #444; }
+
+        /* Interactive Display Box */
+        #display-box {
             background-color: #1e1e1e;
-            padding: 30px;
+            padding: 35px;
             border-radius: 12px;
-            min-height: 120px;
-            line-height: 2.5;
-            font-size: 1.8rem;
+            min-height: 100px;
+            line-height: 2.6;
+            font-size: 2rem;
             text-align: center;
             border: 1px solid #2d2d2d;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        /* Words before you map them */
-        .interactive-chunk {
+        /* Word Block Interactive Styling */
+        .word-token {
             display: inline-block;
-            padding: 2px 6px;
+            cursor: pointer;
+            padding: 2px 8px;
             margin: 4px;
             border-radius: 6px;
-            cursor: pointer;
             user-select: none;
-            border: 1px dashed #444;
-            background: #1a1a1a;
-            transition: all 0.2s;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            border-bottom: 2px solid #444;
         }
         
-        /* Interactive study mode state styling */
-        .study-mode-active {
-            border: 1px solid currentColor !important;
-            background: #252525;
-            font-weight: bold;
+        /* State Visual Effects */
+        .state-chinese { color: #ffffff; border-bottom-color: #00adb5; }
+        .state-pinyin { color: #00ff75; border-bottom-color: #00ff75; font-size: 1.6rem; }
+        .state-english { color: #fff600; border-bottom-color: #fff600; font-size: 1.4rem; padding: 2px 12px; background: #252525; }
+
+        .word-token:hover {
+            background-color: #2a2a2a;
+            transform: scale(1.05);
         }
 
-        /* Sidebar tool for color assignments */
-        #editor-panel {
-            display: none;
-            margin-top: 15px;
-            background: #252525;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 1rem;
+        .hint {
+            font-size: 0.9rem;
+            color: #666;
             text-align: center;
-            border: 1px solid #3d3d3d;
-        }
-
-        .color-dot {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            margin: 0 8px;
-            cursor: pointer;
-            border: 2px solid #fff;
-        }
-
-        .action-bar {
-            display: flex;
-            gap: 10px;
             margin-top: 15px;
         }
-        .mode-btn {
-            flex: 1;
-            padding: 10px;
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        .mode-btn.active {
-            background: #00adb5;
-            border-color: #00adb5;
-        }
-
-        .hint { font-size: 0.9rem; color: #666; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>Chinese Study Canvas</h2>
-        
-        <div class="setup-box">
-            <textarea id="source-input" placeholder="Paste your 3 lines straight from Notes here...&#10;Line 1: Chinese words separated by spaces&#10;Line 2: Pinyin words separated by spaces&#10;Line 3: English fragments separated by spaces"></textarea>
-            <button class="main-btn" onclick="loadSentence()">Load Text Into Canvas</button>
+        <!-- HEADER / NAVIGATION -->
+        <div id="nav-bar" style="display: none; width: 100%; text-align: left;">
+            <button class="back-btn" onclick="showInputPage()">⬅ Back to Input</button>
         </div>
 
-        <div class="action-bar" id="controls" style="display: none;">
-            <button id="btn-edit" class="mode-btn active" onclick="setMode('edit')">🎨 Step 1: Assign Colors</button>
-            <button id="btn-study" class="mode-btn" onclick="setMode('study')">📖 Step 2: Practice Mode</button>
+        <!-- PAGE 1: INPUT PAGE -->
+        <div id="input-page" class="page active">
+            <h2>AI Chinese Study Tool</h2>
+            <textarea id="ai-input" placeholder="Paste the structured text output directly from your AI chatbot here...&#10;&#10;Example format:&#10;爱美 | Ài měi | Loving beauty&#10;大概 | dàgài | probably"></textarea>
+            <button onclick="parseAndLoadStudy()">Generate Flash-Sentence</button>
         </div>
 
-        <!-- Color Picker pop up menu item -->
-        <div id="editor-panel">
-            <p style="margin: 0 0 10px 0; font-size: 0.95rem;">Select a word on the canvas, then pick a study color:</p>
-            <span class="color-dot" style="background: #ff2e63;" onclick="applyColor('#ff2e63')"></span>
-            <span class="color-dot" style="background: #00ff75;" onclick="applyColor('#00ff75')"></span>
-            <span class="color-dot" style="background: #fff600;" onclick="applyColor('#fff600')"></span>
-            <span class="color-dot" style="background: #e0e0e0;" onclick="applyColor('#e0e0e0')"></span>
+        <!-- PAGE 2: STUDY PAGE -->
+        <div id="study-page" class="page">
+            <h2>Interactive Sentence</h2>
+            <div id="display-box"></div>
+            <div class="hint">Tap any word to cycle: White (Character) → Green (Pinyin) → Yellow (Translation)</div>
         </div>
-
-        <h3>Canvas View</h3>
-        <div id="workspace">Load a sentence to get started...</div>
-        <div class="hint" id="status-hint">Paste your text block above to start building.</div>
     </div>
 
     <script>
-        let currentMode = 'edit'; 
-        let selectedElement = null;
+        function showInputPage() {
+            document.getElementById('study-page').classList.remove('active');
+            document.getElementById('input-page').classList.add('active');
+            document.getElementById('nav-bar').style.display = 'none';
+        }
 
-        function loadSentence() {
-            const raw = document.getElementById('source-input').value;
-            const lines = raw.split('\n').filter(l => l.trim() !== "");
-            
-            if (lines.length < 3) {
-                alert("Please make sure you have pasted all 3 lines!");
+        function parseAndLoadStudy() {
+            const rawText = document.getElementById('ai-input').value.trim();
+            if (!rawText) {
+                alert("Please paste the AI output data first!");
                 return;
             }
 
-            const characters = lines[0].trim().split(/\s+/);
-            const pinyin = lines[1].trim().split(/\s+/);
-            const english = lines[2].trim().split(/\s+/);
+            const lines = rawText.split('\n').filter(l => l.trim() !== "");
+            const displayBox = document.getElementById('display-box');
+            displayBox.innerHTML = ""; // Clear out previous tokens
 
-            const workspace = document.getElementById('workspace');
-            workspace.innerHTML = "";
+            let validLinesCount = 0;
 
-            characters.forEach((char, index) => {
-                const span = document.createElement('span');
-                span.className = 'interactive-chunk';
-                span.textContent = char;
+            lines.forEach(line => {
+                // Split lines using the pipe '|' character assigned by the chatbot
+                const parts = line.split('|').map(p => p.trim());
                 
-                // Store structural configurations right inside element datasets
-                span.dataset.char = char;
-                span.dataset.pinyin = pinyin[index] || "---";
-                span.dataset.english = english[index] || "---";
-                span.dataset.state = "0"; // 0=Char, 1=Pinyin, 2=English
-                span.dataset.colored = "false";
+                // Ensure the line has all three components: Chinese, Pinyin, English
+                if (parts.length >= 3) {
+                    validLinesCount++;
+                    const chinese = parts[0];
+                    const pinyin = parts[1];
+                    const english = parts[2];
 
-                span.onclick = () => handleWordClick(span);
-                workspace.appendChild(span);
+                    // Create dynamic text container element
+                    const token = document.createElement('span');
+                    token.className = 'word-token state-chinese';
+                    token.textContent = chinese;
+
+                    // State tracker: 0 = Chinese, 1 = Pinyin, 2 = English
+                    let currentState = 0;
+
+                    token.onclick = () => {
+                        currentState = (currentState + 1) % 3;
+                        
+                        // Clear out previous phase visual tracking classes
+                        token.className = 'word-token';
+
+                        if (currentState === 0) {
+                            token.textContent = chinese;
+                            token.classList.add('state-chinese');
+                        } else if (currentState === 1) {
+                            token.textContent = pinyin;
+                            token.classList.add('state-pinyin');
+                        } else if (currentState === 2) {
+                            token.textContent = english;
+                            token.classList.add('state-english');
+                        }
+                    };
+
+                    displayBox.appendChild(token);
+                    // Insert a space element between characters so sentence reading fragments stack naturally
+                    displayBox.appendChild(document.createTextNode(" "));
+                }
             });
 
-            document.getElementById('controls').style.display = 'flex';
-            setMode('edit');
-            document.getElementById('status-hint').textContent = "Click a word to highlight it, then tap a color dot below.";
-        }
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.getElementById('btn-edit').className = 'mode-btn' + (mode === 'edit' ? ' active' : '');
-            document.getElementById('btn-study').className = 'mode-btn' + (mode === 'study' ? ' active' : '');
-            
-            const panel = document.getElementById('editor-panel');
-            const chunks = document.querySelectorAll('.interactive-chunk');
-
-            if (mode === 'edit') {
-                panel.style.display = 'block';
-                document.getElementById('status-hint').textContent = "Editing Mode: Map your keywords out with neon colors.";
-                // Revert text displays back to standard Chinese characters for quick configurations
-                chunks.forEach(c => {
-                    c.textContent = c.dataset.char;
-                    c.dataset.state = "0";
-                    if(c.dataset.colored === "false") c.style.color = "#e0e0e0";
-                });
-            } else {
-                panel.style.display = 'none';
-                if(selectedElement) selectedElement.style.background = "transparent";
-                selectedElement = null;
-                document.getElementById('status-hint').textContent = "Study Mode Activated! Tap your colored vocabulary keywords to cycle states.";
-                
-                // Lock non-colored words down so only your highlighted vocabulary interacts
-                chunks.forEach(c => {
-                    if (c.dataset.colored === "true") {
-                        c.classList.add('study-mode-active');
-                    } else {
-                        c.classList.remove('study-mode-active');
-                        c.style.color = "#555555"; // Dim background text out slightly
-                    }
-                });
-            }
-        }
-
-        function handleWordClick(el) {
-            if (currentMode === 'edit') {
-                if (selectedElement) selectedElement.style.background = "transparent";
-                selectedElement = el;
-                el.style.background = "#333"; // Visual highlight box selection indicator
-            } else {
-                // Practice Cycling Mode
-                if (el.dataset.colored !== "true") return; // Ignore standard static text elements
-                
-                let state = parseInt(el.dataset.state);
-                state = (state + 1) % 3;
-                el.dataset.state = state;
-
-                if (state === 0) el.textContent = el.dataset.char;
-                else if (state === 1) el.textContent = el.dataset.pinyin;
-                else if (state === 2) el.textContent = el.dataset.english;
-            }
-        }
-
-        function applyColor(color) {
-            if (!selectedElement) {
-                alert("Please click a word on the canvas view above first!");
+            if (validLinesCount === 0) {
+                alert("Error: The text format didn't match. Make sure the lines contain the '|' separator character!");
                 return;
             }
-            selectedElement.style.color = color;
-            if (color === '#e0e0e0') {
-                selectedElement.dataset.colored = "false";
-            } else {
-                selectedElement.dataset.colored = "true";
-            }
-            selectedElement.style.background = "transparent";
-            selectedElement = null;
+
+            // Switch UI views cleanly
+            document.getElementById('input-page').classList.remove('active');
+            document.getElementById('study-page').classList.add('active');
+            document.getElementById('nav-bar').style.display = 'block';
         }
     </script>
 </body>
