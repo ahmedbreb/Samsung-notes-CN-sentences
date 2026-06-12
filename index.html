@@ -2,43 +2,145 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chinese Study Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chinese Study Reader</title>
     <style>
-        body { background-color: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
-        #input-area { width: 100%; height: 120px; background: #1e1e1e; color: white; border: 1px solid #444; padding: 10px; border-radius: 8px; }
-        .word-block { display: inline-block; padding: 5px; margin: 2px; border: 1px solid #333; cursor: pointer; border-radius: 4px; background: #252525; min-width: 40px; text-align: center; }
-        #display { margin-top: 20px; font-size: 1.5rem; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        h2, h3 { color: #fff; text-align: center; }
+        textarea {
+            width: 100%;
+            height: 120px;
+            background: #1e1e1e;
+            color: #fff;
+            border: 2px dashed #444;
+            padding: 10px;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            resize: none;
+        }
+        textarea:focus {
+            border-color: #00adb5;
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background-color: #00adb5;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover { background-color: #008c95; }
+        #display {
+            margin-top: 25px;
+            background-color: #1e1e1e;
+            padding: 25px;
+            border-radius: 8px;
+            min-height: 100px;
+            line-height: 2.2;
+            font-size: 1.8rem;
+            text-align: center;
+            border: 1px solid #2d2d2d;
+        }
+        .word-block {
+            display: inline-block;
+            cursor: pointer;
+            padding: 2px 8px;
+            margin: 4px;
+            border-radius: 6px;
+            user-select: none;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .word-block:hover {
+            background-color: #2a2a2a;
+            transform: scale(1.05);
+        }
+        .instructions {
+            font-size: 0.9rem;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
-    <h2>Paste your 3 lines:</h2>
-    <textarea id="input-area" placeholder="Paste Chinese, Pinyin, and English lines here..."></textarea>
-    <button onclick="processText()" style="margin-top:10px; padding:10px;">Build Study Set</button>
-    <div id="display"></div>
+
+    <div class="container">
+        <h2>Chinese Study Reader</h2>
+        <textarea id="input-area" placeholder="Paste your 3 lines separated by slashes (/) here..."></textarea>
+        <button onclick="processText()">Generate Interactive Sentence</button>
+
+        <h3>Interactive Study View</h3>
+        <div id="display">Your text will load here...</div>
+        <div class="instructions">Tap any colored word to cycle: Character → Pinyin → Translation</div>
+    </div>
 
     <script>
+        // A list of bright neon colors that stand out perfectly on dark mode
+        const neonColors = ['#00adb5', '#ff2e63', '#00ff75', '#fff600', '#ff9f43', '#a55eea', '#45aaf2', '#fed330'];
+
         function processText() {
-            const lines = document.getElementById('input-area').value.split('\n').filter(l => l.trim() !== "");
-            if (lines.length < 3) { alert("Please paste at least 3 lines!"); return; }
+            const rawText = document.getElementById('input-area').value;
+            const lines = rawText.split('\n').filter(line => line.trim() !== "");
             
-            const chinese = lines[0].split(/\s+/);
-            const pinyin = lines[1].split(/\s+/);
-            const meaning = lines[2].split(/\s+/);
-            
+            if (lines.length < 3) {
+                alert("Error: Make sure you paste all 3 lines (Characters, Pinyin, Translation)!");
+                return;
+            }
+
+            // Split each line using the slash separator
+            const chineseParts = lines[0].split('/').map(p => p.trim());
+            const pinyinParts = lines[1].split('/').map(p => p.trim());
+            const translationParts = lines[2].split('/').map(p => p.trim());
+
             const display = document.getElementById('display');
-            display.innerHTML = "";
-            
-            for (let i = 0; i < chinese.length; i++) {
-                const block = document.createElement('div');
+            display.innerHTML = ""; // Clear current view
+
+            // Run through the elements based on the parsed Chinese line structure
+            for (let i = 0; i < chineseParts.length; i++) {
+                if (!chineseParts[i]) continue;
+
+                const block = document.createElement('span');
                 block.className = 'word-block';
-                block.dataset.state = 0;
-                block.textContent = chinese[i];
                 
+                // Pick a color from our neon list sequentially
+                const assignedColor = neonColors[i % neonColors.length];
+                block.style.color = assignedColor;
+                
+                // Set initial character state
+                block.textContent = chineseParts[i] + " ";
+                
+                // State tracking logic: 0 = Chinese, 1 = Pinyin, 2 = Translation
+                let state = 0;
+
                 block.onclick = () => {
-                    block.dataset.state = (parseInt(block.dataset.state) + 1) % 3;
-                    const s = block.dataset.state;
-                    block.textContent = (s == 0) ? chinese[i] : (s == 1) ? (pinyin[i] || "---") : (meaning[i] || "---");
+                    state = (state + 1) % 3;
+                    if (state === 0) {
+                        block.textContent = chineseParts[i] + " ";
+                    } else if (state === 1) {
+                        block.textContent = (pinyinParts[i] || "???") + " ";
+                    } else if (state === 2) {
+                        block.textContent = (translationParts[i] || "???") + " ";
+                    }
                 };
+
                 display.appendChild(block);
             }
         }
