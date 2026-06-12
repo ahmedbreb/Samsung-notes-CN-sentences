@@ -47,11 +47,18 @@
             outline: none;
         }
 
-        /* Buttons */
+        /* Buttons Layout */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
         button {
             width: 100%;
             padding: 14px;
-            margin-top: 15px;
             background-color: #00adb5;
             color: #fff;
             border: none;
@@ -59,14 +66,32 @@
             font-size: 1.1rem;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
+            touch-action: manipulation; /* FIX: Prevents double-tap zoom glitch */
         }
         button:hover { background-color: #008c95; }
+        button:active { transform: scale(0.98); }
+
+        /* Secondary Clear Button */
+        button.clear-btn {
+            background-color: transparent;
+            color: #aaa;
+            border: 1px solid #444;
+            font-size: 0.9rem;
+            font-weight: normal;
+            padding: 8px 16px;
+            width: auto;
+            border-radius: 6px;
+        }
+        button.clear-btn:hover { 
+            background-color: #222; 
+            color: #fff;
+            border-color: #666;
+        }
 
         button.back-btn {
             background-color: #333;
             border: 1px solid #444;
-            margin-top: 0;
             margin-bottom: 20px;
             width: auto;
             padding: 8px 16px;
@@ -80,7 +105,7 @@
             padding: 35px;
             border-radius: 12px;
             min-height: 100px;
-            line-height: 2.6;
+            line-height: 2.8;
             font-size: 2rem;
             text-align: center;
             border: 1px solid #2d2d2d;
@@ -94,10 +119,17 @@
             padding: 2px 8px;
             margin: 4px;
             border-radius: 6px;
-            user-select: none;
             font-weight: 500;
-            transition: all 0.15s ease;
+            transition: background-color 0.15s ease, transform 0.1s;
             border-bottom: 2px solid #444;
+            
+            /* FIX: Strict rules to completely stop text selection / highlighting glitches */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
         
         /* State Visual Effects */
@@ -107,7 +139,9 @@
 
         .word-token:hover {
             background-color: #2a2a2a;
-            transform: scale(1.05);
+        }
+        .word-token:active {
+            transform: scale(0.95);
         }
 
         .hint {
@@ -130,7 +164,11 @@
         <div id="input-page" class="page active">
             <h2>AI Chinese Study Tool</h2>
             <textarea id="ai-input" placeholder="Paste the structured text output directly from your AI chatbot here...&#10;&#10;Example format:&#10;爱美 | Ài měi | Loving beauty&#10;大概 | dàgài | probably"></textarea>
-            <button onclick="parseAndLoadStudy()">Generate Flash-Sentence</button>
+            
+            <div class="btn-group">
+                <button onclick="parseAndLoadStudy()">Generate Flash-Sentence</button>
+                <button class="clear-btn" onclick="clearText()">Clear Text</button>
+            </div>
         </div>
 
         <!-- PAGE 2: STUDY PAGE -->
@@ -142,6 +180,13 @@
     </div>
 
     <script>
+        const inputArea = document.getElementById('ai-input');
+
+        function clearText() {
+            inputArea.value = '';
+            inputArea.focus();
+        }
+
         function showInputPage() {
             document.getElementById('study-page').classList.remove('active');
             document.getElementById('input-page').classList.add('active');
@@ -149,7 +194,7 @@
         }
 
         function parseAndLoadStudy() {
-            const rawText = document.getElementById('ai-input').value.trim();
+            const rawText = inputArea.value.trim();
             if (!rawText) {
                 alert("Please paste the AI output data first!");
                 return;
@@ -162,28 +207,25 @@
             let validLinesCount = 0;
 
             lines.forEach(line => {
-                // Split lines using the pipe '|' character assigned by the chatbot
                 const parts = line.split('|').map(p => p.trim());
                 
-                // Ensure the line has all three components: Chinese, Pinyin, English
                 if (parts.length >= 3) {
                     validLinesCount++;
                     const chinese = parts[0];
                     const pinyin = parts[1];
                     const english = parts[2];
 
-                    // Create dynamic text container element
                     const token = document.createElement('span');
                     token.className = 'word-token state-chinese';
                     token.textContent = chinese;
 
-                    // State tracker: 0 = Chinese, 1 = Pinyin, 2 = English
                     let currentState = 0;
 
-                    token.onclick = () => {
-                        currentState = (currentState + 1) % 3;
+                    token.onclick = (e) => {
+                        // Extra insurance against double-click triggers
+                        e.preventDefault(); 
                         
-                        // Clear out previous phase visual tracking classes
+                        currentState = (currentState + 1) % 3;
                         token.className = 'word-token';
 
                         if (currentState === 0) {
@@ -199,7 +241,6 @@
                     };
 
                     displayBox.appendChild(token);
-                    // Insert a space element between characters so sentence reading fragments stack naturally
                     displayBox.appendChild(document.createTextNode(" "));
                 }
             });
@@ -209,7 +250,6 @@
                 return;
             }
 
-            // Switch UI views cleanly
             document.getElementById('input-page').classList.remove('active');
             document.getElementById('study-page').classList.add('active');
             document.getElementById('nav-bar').style.display = 'block';
