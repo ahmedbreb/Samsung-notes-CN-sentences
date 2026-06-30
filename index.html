@@ -287,19 +287,19 @@
                 toggleBtn.style.display = "none";
             }
 
-            // --- TEXT SANITIZATION STEP ---
-            // This regex detects where a Note ends and a new Chinese word or punctuation block begins on a single line.
-            // It spots patterns like "Direct match. 到处" or "match. ，" and cleanly places a line break between them.
-            rawText = rawText.replace(/([^|\n]+?)(?=\s+[^|\n\s]+\s*\|)/g, "$1\n");
+            // --- FIXED ROBUST SPLITTER ---
+            // Finds the note's punctuation (like "match.") followed by space, right before the next item begins.
+            // Works flawlessly even at the very end of sentences.
+            rawText = rawText.replace(/([\.）\?\.!])\s+(?=[^|\n]+?\|)/g, "$1\n");
 
-            // Split into physical lines now that everything is safely formatted line-by-line
+            // Split into clean lines
             const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== "");
             const dataSegments = [];
 
             lines.forEach(line => {
                 const parts = line.split('|').map(p => p.trim());
                 
-                // Ensure we have at least Chinese, Pinyin, and Translation
+                // Read up to 4 potential items per split block safely
                 if (parts.length >= 3) {
                     const chinese = parts[0];
                     const pinyin = parts[1];
@@ -322,10 +322,10 @@
                 let displayEnglish = data.english === "—" ? "Not directly translated" : data.english;
                 let displayNote = data.note === "—" ? "" : data.note;
 
-                // Strip curly quotes commonly provided around translation text blocks
+                // Strip any accidental curly quotes provided around translation blocks
                 displayEnglish = displayEnglish.replace(/^["“'‘]|["”'’]$/g, '');
 
-                // Note filtering rules logic check
+                // Clean checks for determining if notes should show up
                 const cleanNoteCheck = displayNote.toLowerCase().replace(/[\s\.]/g, '');
                 const hasValidNote = (displayNote !== "" && cleanNoteCheck !== "directmatch" && cleanNoteCheck !== "punctuation");
 
