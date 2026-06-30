@@ -1,3 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chinese Pattern Study App</title>
+    <style>
+        /* Modern Dark Mode Styling */
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 700px;
+            width: 100%;
+        }
+
+        h2, h3 { text-align: center; color: #ffffff; margin-bottom: 20px; }
+        h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; color: #00adb5; }
+
+        /* Pages */
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* Input Screen Layout */
+        textarea {
+            width: 100%;
+            background: #1e1e1e;
+            color: #fff;
+            border: 2px dashed #444;
+            padding: 15px;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            resize: none;
+            font-family: monospace;
+            margin-bottom: 15px;
+        }
+        textarea:focus {
+            border-color: #00adb5;
+            outline: none;
+        }
+        
+        #ai-input { height: 180px; }
+        #full-sentence-input { height: 90px; border-style: dotted; }
+
+        /* Navigation Header */
+        #nav-bar {
+            display: none;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        /* Buttons Layout */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #00adb5;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            touch-action: manipulation;
+        }
+        button:hover { background-color: #008c95; }
+        button:active { transform: scale(0.98); }
+
+        .generate-btn { width: 100%; font-size: 1.1rem; padding: 14px; }
+
+        button.clear-btn {
+            background-color: transparent;
+            color: #aaa;
+            border: 1px solid #444;
+            font-size: 0.9rem;
+            font-weight: normal;
+            padding: 8px 16px;
+            width: auto;
+            border-radius: 6px;
+        }
+        button.clear-btn:hover { 
+            background-color: #222; 
+            color: #fff;
+            border-color: #666;
+        }
+
+        button.nav-btn {
+            background-color: #252525;
+            border: 1px solid #444;
+            font-size: 0.9rem;
+        }
+        button.nav-btn:hover { background-color: #333; border-color: #555; }
+        button.toggle-active { background-color: #ff2e63; border-color: #ff2e63; color: white; }
+        button.toggle-active:hover { background-color: #e21b4f; }
+
+        /* Display Panels */
+        #display-box, #sentence-box {
+            background-color: #1e1e1e;
+            padding: 35px;
+            border-radius: 12px;
+            min-height: 120px;
+            line-height: 2.8;
+            font-size: 2rem;
+            text-align: center;
+            border: 1px solid #2d2d2d;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            touch-action: manipulation;
+        }
+        
+        #sentence-box {
+            font-size: 1.3rem;
+            text-align: left;
+            line-height: 2;
+            white-space: pre-wrap;
+            border-color: #ff2e63;
+        }
+
+        /* Word Token Interactive Styling */
+        .word-token {
+            display: inline-block;
+            cursor: pointer;
+            padding: 2px 8px;
+            margin: 4px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background-color 0.15s ease, transform 0.1s, border-color 0.2s;
+            border-bottom: 2px solid #444;
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        
+        /* Interactive State Colors */
+        .state-chinese { color: #ffffff; border-bottom-color: #00adb5; }
+        .state-pinyin { color: #00ff75; border-bottom-color: #00ff75; font-size: 1.6rem; }
+        .state-english { color: #fff600; border-bottom-color: #fff600; font-size: 1.4rem; padding: 2px 12px; background: #252525; }
+        .state-note { color: #ff9f43; border-bottom-color: #ff9f43; font-size: 1.2rem; padding: 2px 12px; background: #2d2015; border-style: dashed; }
+
+        /* Highlight currently active word selection track state */
+        .word-token.active-word {
+            outline-color: #00adb5;
+            background-color: #222;
+        }
+
+        .word-token:hover { background-color: #2a2a2a; }
+        .word-token:active { transform: scale(0.95); }
+
+        .hint {
+            font-size: 0.9rem;
+            color: #666;
+            text-align: center;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- HEADER / NAVIGATION (PRACTICE PAGE CONTROLS) -->
+        <div id="nav-bar">
+            <button class="nav-btn" onclick="showInputPage()">⬅ Back to Input</button>
+            <button id="toggle-sentence-btn" class="nav-btn" onclick="toggleSentenceView()">📄 Show Full Sentence</button>
+        </div>
+
+        <!-- PAGE 1: INPUT PAGE -->
+        <div id="input-page" class="page active">
+            <h2>AI Chinese Study Tool</h2>
+            
+            <h3>1. Paste AI Word Breakdown Data (Required)</h3>
+            <textarea id="ai-input" placeholder="Paste structured output here... (Accepts line breaks or continuous single line blocks)"></textarea>
+            
+            <h3>2. Paste Full Reference Text (Optional)</h3>
+            <textarea id="full-sentence-input" placeholder="Paste the original unbroken full sentence, Pinyin, and English translation here for quick reference lookups while studying..."></textarea>
+            
+            <div class="btn-group">
+                <button class="generate-btn" onclick="parseAndLoadStudy()">Generate Flash-Sentence</button>
+                <button class="clear-btn" onclick="clearAllInputs()">Clear All Fields</button>
+            </div>
+        </div>
+
+        <!-- PAGE 2: STUDY PAGE -->
+        <div id="study-page" class="page">
+            <h2 id="study-title">Interactive Sentence View</h2>
+            
+            <!-- Dynamic Workspaces -->
+            <div id="display-box"></div>
+            <div id="sentence-box" style="display: none;"></div>
+            
+            <div class="hint" id="study-hint">Tap any word to pick it, then tap anywhere inside the dark box to cycle information!</div>
+        </div>
+    </div>
+
+    <script>
+        const aiInput = document.getElementById('ai-input');
+        const sentenceInput = document.getElementById('full-sentence-input');
+        const displayBox = document.getElementById('display-box');
+        const sentenceBox = document.getElementById('sentence-box');
+        const toggleBtn = document.getElementById('toggle-sentence-btn');
+        const studyTitle = document.getElementById('study-title');
+        const studyHint = document.getElementById('study-hint');
+
+        let isViewingFullSentence = false;
+        let activeWordToken = null; 
+
+        function clearAllInputs() {
+            aiInput.value = '';
+            sentenceInput.value = '';
+            aiInput.focus();
+        }
+
+        function showInputPage() {
+            document.getElementById('study-page').classList.remove('active');
+            document.getElementById('input-page').classList.add('active');
+            document.getElementById('nav-bar').style.display = 'none';
+            isViewingFullSentence = false;
+            activeWordToken = null;
+            toggleBtn.className = "nav-btn";
+            toggleBtn.textContent = "📄 Show Full Sentence";
+        }
+
+        function toggleSentenceView() {
+            isViewingFullSentence = !isViewingFullSentence;
+            
+            if (isViewingFullSentence) {
+                displayBox.style.display = "none";
+                sentenceBox.style.display = "block";
+                studyTitle.textContent = "Reference Sentence Context";
+                studyHint.style.opacity = "0";
+                toggleBtn.textContent = "📖 Back to Practice";
+                toggleBtn.classList.add('toggle-active');
+            } else {
+                sentenceBox.style.display = "none";
+                displayBox.style.display = "block";
+                studyTitle.textContent = "Interactive Sentence View";
+                studyHint.style.opacity = "1";
+                toggleBtn.textContent = "📄 Show Full Sentence";
+                toggleBtn.classList.remove('toggle-active');
+            }
+        }
+
+        // Global backdrop tap handler targeting workspace container box
+        displayBox.onclick = (e) => {
+            if (activeWordToken && !isViewingFullSentence && e.target === displayBox) {
+                activeWordToken.triggerCycle();
+            }
+        };
+
         function parseAndLoadStudy() {
             let rawText = aiInput.value.trim();
             if (!rawText) {
@@ -57,7 +328,7 @@
                 token.className = 'word-token state-chinese';
                 token.textContent = data.chinese;
 
-                // CHANGED: If a note exists (even if it says "Direct match"), allow the 4th state!
+                // If a note exists (even if it says "Direct match"), allow the 4th state!
                 const hasValidNote = (displayNote !== "");
                 const maxStates = hasValidNote ? 4 : 3;
                 let currentState = 0;
@@ -106,3 +377,6 @@
             sentenceBox.style.display = "none";
             displayBox.style.display = "block";
         }
+    </script>
+</body>
+</html>
