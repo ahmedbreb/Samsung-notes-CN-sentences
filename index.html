@@ -270,7 +270,7 @@
         };
 
         function parseAndLoadStudy() {
-            let rawText = aiInput.value.trim();
+            const rawText = aiInput.value.trim();
             if (!rawText) {
                 alert("Please paste the AI word list data first!");
                 return;
@@ -287,28 +287,52 @@
                 toggleBtn.style.display = "none";
             }
 
-            // SMART MULTI-FORMAT EXTRACTION ENGINE
-            // This replaces literal line split matching. It looks for pipes and catches fragments ending near notes definitions.
+            // FAILSAFE TOKENIZER ENGINE
+            // Instead of splitting by lines or dangerous lookaheads, we split raw text strictly by pipe boundaries.
+            const rawTokens = rawText.split('|').map(t => t.trim());
             const dataSegments = [];
-            
-            // Standardize raw string formatting variations to protect the regex parser pipeline 
-            // Normalize spaces around pipes to make processing perfectly uniform
-            rawText = rawText.replace(/\s*\|\s*/g, ' | ');
 
-            // Regex captures: Word | Pinyin | Translation | Notes (ended by a line break OR catching up to the next word component block)
-            const extractionPattern = /(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*([^|]+?)(?=\s*[^|]+\s*\||$)/g;
-            let match;
+            // Every complete card setup takes exactly 4 raw pipeline values (Chinese, Pinyin, English, Note)
+            // We traverse the sequence and safely bundle everything except the final note block boundaries.
+            let i = 0;
+            while (i < rawTokens.length) {
+                if (i + 2 >= rawTokens.length) break; // Not enough remaining items to build a base card translation
 
-            while ((match = extractionPattern.exec(rawText)) !== null) {
-                let chinese = match[1].trim();
-                let pinyin = match[2].trim();
-                let english = match[3].trim();
-                let note = match[4].trim();
+                let chinese = rawTokens[i];
+                let pinyin = rawTokens[i+1];
+                let english = rawTokens[i+2];
+                let note = "";
 
-                // Clean out any leading/trailing remnants from multiline text merging behaviors
-                // Strip line break residuals inside parsed outputs
+                // Look at the next token item string element block to see if it contains multiple elements merged
+                if (i + 3 < rawTokens.length) {
+                    let textAfterEnglish = rawTokens[i+3];
+                    
+                    // Does the next item contain another card element inside it? 
+                    // We look ahead to check if there is an implicit word boundaries transition sequence.
+                    // If a word contains a space followed by standard non-english characters, it's a merged line start.
+                    // We extract the note portion cleanly up to the next word item boundary.
+                    const wordBoundaryMatch = textAfterEnglish.match(/([\s\S]*?)\s+([\u4e00-\u9fa5\uff00-\uffef\w\s“”‘’.,!?、……？]+)$/);
+                    
+                    if (wordBoundaryMatch && i + 4 < rawTokens.length) {
+                        note = wordBoundaryMatch[1].trim();
+                        // Rewind the tokenizer cursor block loop index position so the next cycle picks up the extracted word prefix correctly
+                        rawTokens[i+3] = wordBoundaryMatch[2].trim();
+                        i += 3;
+                    } else {
+                        // Regular structure line break, assign full remaining block value
+                        note = textAfterEnglish;
+                        i += 4;
+                    }
+                } else {
+                    i += 3; // Terminal word element boundary reached
+                }
+
+                // Clean line break artifacts out of variables
                 chinese = chinese.replace(/[\r\n]+/g, " ").trim();
-                
+                pinyin = pinyin.replace(/[\r\n]+/g, " ").trim();
+                english = english.replace(/[\r\n]+/g, " ").trim();
+                note = note.replace(/[\r\n]+/g, " ").trim();
+
                 if (chinese) {
                     dataSegments.push({ chinese, pinyin, english, note });
                 }
@@ -320,12 +344,13 @@
             }
 
             dataSegments.forEach(data => {
-                // Clean up em-dashes fallback text markers commonly left by LLMs
                 let displayPinyin = data.pinyin === "—" ? "" : data.pinyin;
                 let displayEnglish = data.english === "—" ? "Not directly translated" : data.english;
                 let displayNote = data.note === "—" ? "" : data.note;
 
-                // Process Direct Match skipping conditions dynamically
+                // Strip quotes around translation text if present in prompt feed strings
+                displayEnglish = displayEnglish.replace(/^["“'‘]|["”'’]$/g, '');
+
                 const cleanNoteCheck = displayNote.toLowerCase().replace(/[\s\.]/g, '');
                 const hasValidNote = (displayNote !== "" && cleanNoteCheck !== "directmatch" && cleanNoteCheck !== "punctuation");
 
@@ -374,7 +399,6 @@
                 displayBox.appendChild(document.createTextNode(" "));
             });
 
-            // Swap view layouts
             document.getElementById('input-page').classList.remove('active');
             document.getElementById('study-page').classList.add('active');
             document.getElementById('nav-bar').style.display = 'flex';
@@ -384,4 +408,3 @@
     </script>
 </body>
 </html>
-
