@@ -160,7 +160,7 @@
         .state-english { color: #fff600; border-bottom-color: #fff600; font-size: 1.4rem; padding: 2px 12px; background: #252525; }
         .state-note { color: #ff9f43; border-bottom-color: #ff9f43; font-size: 1.2rem; padding: 2px 12px; background: #2d2015; border-style: dashed; }
 
-        /* Glimmer outline animation signaling active selection capture */
+        /* Highlight currently active word selection track state */
         .word-token.active-word {
             outline-color: #00adb5;
             background-color: #222;
@@ -180,16 +180,18 @@
 <body>
 
     <div class="container">
+        <!-- HEADER / NAVIGATION (PRACTICE PAGE CONTROLS) -->
         <div id="nav-bar">
             <button class="nav-btn" onclick="showInputPage()">⬅ Back to Input</button>
             <button id="toggle-sentence-btn" class="nav-btn" onclick="toggleSentenceView()">📄 Show Full Sentence</button>
         </div>
 
+        <!-- PAGE 1: INPUT PAGE -->
         <div id="input-page" class="page active">
             <h2>AI Chinese Study Tool</h2>
             
             <h3>1. Paste AI Word Breakdown Data (Required)</h3>
-            <textarea id="ai-input" placeholder="Paste structured output...&#10;Format: Word | Pinyin | Translation | Notes"></textarea>
+            <textarea id="ai-input" placeholder="Paste structured output here... (Accepts line breaks or continuous block sentences)"></textarea>
             
             <h3>2. Paste Full Reference Text (Optional)</h3>
             <textarea id="full-sentence-input" placeholder="Paste the original unbroken full sentence, Pinyin, and English translation here for quick reference lookups while studying..."></textarea>
@@ -200,9 +202,11 @@
             </div>
         </div>
 
+        <!-- PAGE 2: STUDY PAGE -->
         <div id="study-page" class="page">
             <h2 id="study-title">Interactive Sentence View</h2>
             
+            <!-- Dynamic Workspaces -->
             <div id="display-box"></div>
             <div id="sentence-box" style="display: none;"></div>
             
@@ -220,7 +224,7 @@
         const studyHint = document.getElementById('study-hint');
 
         let isViewingFullSentence = false;
-        let activeWordToken = null; // Globally tracks the selected element node
+        let activeWordToken = null; 
 
         function clearAllInputs() {
             aiInput.value = '';
@@ -258,24 +262,22 @@
             }
         }
 
-        // Global background click listener attached right to the study presentation tray box
+        // Global empty backdrop background tap handler targeting workspace area
         displayBox.onclick = (e) => {
-            // Ensure a token is active, we are not viewing full text, and the click targeted the empty space
             if (activeWordToken && !isViewingFullSentence && e.target === displayBox) {
                 activeWordToken.triggerCycle();
             }
         };
 
         function parseAndLoadStudy() {
-            const rawText = aiInput.value.trim();
+            let rawText = aiInput.value.trim();
             if (!rawText) {
                 alert("Please paste the AI word list data first!");
                 return;
             }
 
-            const lines = rawText.split('\n').filter(l => l.trim() !== "");
             displayBox.innerHTML = ""; 
-            activeWordToken = null; // Clear out active tokens states on new load
+            activeWordToken = null; 
             
             const fullRefText = sentenceInput.value.trim();
             if(fullRefText) {
@@ -285,75 +287,94 @@
                 toggleBtn.style.display = "none";
             }
 
-            let validLinesCount = 0;
+            // SMART MULTI-FORMAT EXTRACTION ENGINE
+            // This replaces literal line split matching. It looks for pipes and catches fragments ending near notes definitions.
+            const dataSegments = [];
+            
+            // Standardize raw string formatting variations to protect the regex parser pipeline 
+            // Normalize spaces around pipes to make processing perfectly uniform
+            rawText = rawText.replace(/\s*\|\s*/g, ' | ');
 
-            lines.forEach(line => {
-                const parts = line.split('|').map(p => p.trim());
+            // Regex captures: Word | Pinyin | Translation | Notes (ended by a line break OR catching up to the next word component block)
+            const extractionPattern = /(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*([^|]+?)(?=\s*[^|]+\s*\||$)/g;
+            let match;
+
+            while ((match = extractionPattern.exec(rawText)) !== null) {
+                let chinese = match[1].trim();
+                let pinyin = match[2].trim();
+                let english = match[3].trim();
+                let note = match[4].trim();
+
+                // Clean out any leading/trailing remnants from multiline text merging behaviors
+                // Strip line break residuals inside parsed outputs
+                chinese = chinese.replace(/[\r\n]+/g, " ").trim();
                 
-                if (parts.length >= 3) {
-                    validLinesCount++;
-                    const chinese = parts[0];
-                    const pinyin = parts[1];
-                    const english = parts[2];
-                    
-                    let note = parts[3] ? parts[3] : "";
-                    const cleanNote = note.toLowerCase().replace(/[\s\.]/g, '');
-                    const hasValidNote = (note !== "" && cleanNote !== "directmatch");
-
-                    const token = document.createElement('span');
-                    token.className = 'word-token state-chinese';
-                    token.textContent = chinese;
-
-                    const maxStates = hasValidNote ? 4 : 3;
-                    let currentState = 0;
-
-                    // Encapsulated state advance runner function shared by token click and backdrop tap actions
-                    token.triggerCycle = () => {
-                        currentState = (currentState + 1) % maxStates;
-                        token.className = 'word-token' + (token === activeWordToken ? ' active-word' : '');
-
-                        if (currentState === 0) {
-                            token.textContent = chinese;
-                            token.classList.add('state-chinese');
-                        } else if (currentState === 1) {
-                            token.textContent = pinyin;
-                            token.classList.add('state-pinyin');
-                        } else if (currentState === 2) {
-                            token.textContent = english;
-                            token.classList.add('state-english');
-                        } else if (currentState === 3) {
-                            token.textContent = note;
-                            token.classList.add('state-note');
-                        }
-                    };
-
-                    token.onclick = (e) => {
-                        e.stopPropagation(); // Block element click event bubbling to backdrop trigger action
-                        e.preventDefault(); 
-                        
-                        // Scenario A: Tapping the already highlighted active block -> trigger its info rotation cycle
-                        if (activeWordToken === token) {
-                            token.triggerCycle();
-                        } else {
-                            // Scenario B: Selecting a brand new token -> reset old active token border styles
-                            if (activeWordToken) {
-                                activeWordToken.classList.remove('active-word');
-                            }
-                            activeWordToken = token;
-                            token.classList.add('active-word');
-                        }
-                    };
-
-                    displayBox.appendChild(token);
-                    displayBox.appendChild(document.createTextNode(" "));
+                if (chinese) {
+                    dataSegments.push({ chinese, pinyin, english, note });
                 }
-            });
+            }
 
-            if (validLinesCount === 0) {
-                alert("Error: The text format didn't match. Remember to use the '|' separators!");
+            if (dataSegments.length === 0) {
+                alert("Error: The text format couldn't be automatically extracted. Please check your data contains '|' dividers.");
                 return;
             }
 
+            dataSegments.forEach(data => {
+                // Clean up em-dashes fallback text markers commonly left by LLMs
+                let displayPinyin = data.pinyin === "—" ? "" : data.pinyin;
+                let displayEnglish = data.english === "—" ? "Not directly translated" : data.english;
+                let displayNote = data.note === "—" ? "" : data.note;
+
+                // Process Direct Match skipping conditions dynamically
+                const cleanNoteCheck = displayNote.toLowerCase().replace(/[\s\.]/g, '');
+                const hasValidNote = (displayNote !== "" && cleanNoteCheck !== "directmatch" && cleanNoteCheck !== "punctuation");
+
+                const token = document.createElement('span');
+                token.className = 'word-token state-chinese';
+                token.textContent = data.chinese;
+
+                const maxStates = hasValidNote ? 4 : 3;
+                let currentState = 0;
+
+                token.triggerCycle = () => {
+                    currentState = (currentState + 1) % maxStates;
+                    token.className = 'word-token' + (token === activeWordToken ? ' active-word' : '');
+
+                    if (currentState === 0) {
+                        token.textContent = data.chinese;
+                        token.classList.add('state-chinese');
+                    } else if (currentState === 1) {
+                        token.textContent = displayPinyin || "—";
+                        token.classList.add('state-pinyin');
+                    } else if (currentState === 2) {
+                        token.textContent = displayEnglish;
+                        token.classList.add('state-english');
+                    } else if (currentState === 3) {
+                        token.textContent = displayNote;
+                        token.classList.add('state-note');
+                    }
+                };
+
+                token.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault(); 
+                    
+                    if (activeWordToken === token) {
+                        token.triggerCycle();
+                    } else {
+                        if (activeWordToken) {
+                            activeWordToken.classList.remove('active-word');
+                        }
+                        activeWordToken = token;
+                        token.classList.add('active-word');
+                    }
+                };
+
+                displayBox.appendChild(token);
+                displayBox.appendChild(document.createTextNode(" "));
+            });
+
+            // Swap view layouts
             document.getElementById('input-page').classList.remove('active');
             document.getElementById('study-page').classList.add('active');
             document.getElementById('nav-bar').style.display = 'flex';
@@ -363,3 +384,4 @@
     </script>
 </body>
 </html>
+
