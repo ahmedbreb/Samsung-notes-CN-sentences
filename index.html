@@ -191,7 +191,7 @@
             <h2>AI Chinese Study Tool</h2>
             
             <h3>1. Paste AI Word Breakdown Data (Required)</h3>
-            <textarea id="ai-input" placeholder="Paste structured output here... (Accepts line breaks or continuous block sentences)"></textarea>
+            <textarea id="ai-input" placeholder="Paste structured output here... (Accepts line breaks or continuous single line blocks)"></textarea>
             
             <h3>2. Paste Full Reference Text (Optional)</h3>
             <textarea id="full-sentence-input" placeholder="Paste the original unbroken full sentence, Pinyin, and English translation here for quick reference lookups while studying..."></textarea>
@@ -262,7 +262,7 @@
             }
         }
 
-        // Global empty backdrop background tap handler targeting workspace area
+        // Global backdrop tap handler targeting workspace container box
         displayBox.onclick = (e) => {
             if (activeWordToken && !isViewingFullSentence && e.target === displayBox) {
                 activeWordToken.triggerCycle();
@@ -270,7 +270,7 @@
         };
 
         function parseAndLoadStudy() {
-            const rawText = aiInput.value.trim();
+            let rawText = aiInput.value.trim();
             if (!rawText) {
                 alert("Please paste the AI word list data first!");
                 return;
@@ -287,56 +287,30 @@
                 toggleBtn.style.display = "none";
             }
 
-            // FAILSAFE TOKENIZER ENGINE
-            // Instead of splitting by lines or dangerous lookaheads, we split raw text strictly by pipe boundaries.
-            const rawTokens = rawText.split('|').map(t => t.trim());
+            // --- TEXT SANITIZATION STEP ---
+            // This regex detects where a Note ends and a new Chinese word or punctuation block begins on a single line.
+            // It spots patterns like "Direct match. 到处" or "match. ，" and cleanly places a line break between them.
+            rawText = rawText.replace(/([^|\n]+?)(?=\s+[^|\n\s]+\s*\|)/g, "$1\n");
+
+            // Split into physical lines now that everything is safely formatted line-by-line
+            const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== "");
             const dataSegments = [];
 
-            // Every complete card setup takes exactly 4 raw pipeline values (Chinese, Pinyin, English, Note)
-            // We traverse the sequence and safely bundle everything except the final note block boundaries.
-            let i = 0;
-            while (i < rawTokens.length) {
-                if (i + 2 >= rawTokens.length) break; // Not enough remaining items to build a base card translation
+            lines.forEach(line => {
+                const parts = line.split('|').map(p => p.trim());
+                
+                // Ensure we have at least Chinese, Pinyin, and Translation
+                if (parts.length >= 3) {
+                    const chinese = parts[0];
+                    const pinyin = parts[1];
+                    const english = parts[2];
+                    const note = parts[3] ? parts[3] : "";
 
-                let chinese = rawTokens[i];
-                let pinyin = rawTokens[i+1];
-                let english = rawTokens[i+2];
-                let note = "";
-
-                // Look at the next token item string element block to see if it contains multiple elements merged
-                if (i + 3 < rawTokens.length) {
-                    let textAfterEnglish = rawTokens[i+3];
-                    
-                    // Does the next item contain another card element inside it? 
-                    // We look ahead to check if there is an implicit word boundaries transition sequence.
-                    // If a word contains a space followed by standard non-english characters, it's a merged line start.
-                    // We extract the note portion cleanly up to the next word item boundary.
-                    const wordBoundaryMatch = textAfterEnglish.match(/([\s\S]*?)\s+([\u4e00-\u9fa5\uff00-\uffef\w\s“”‘’.,!?、……？]+)$/);
-                    
-                    if (wordBoundaryMatch && i + 4 < rawTokens.length) {
-                        note = wordBoundaryMatch[1].trim();
-                        // Rewind the tokenizer cursor block loop index position so the next cycle picks up the extracted word prefix correctly
-                        rawTokens[i+3] = wordBoundaryMatch[2].trim();
-                        i += 3;
-                    } else {
-                        // Regular structure line break, assign full remaining block value
-                        note = textAfterEnglish;
-                        i += 4;
+                    if (chinese) {
+                        dataSegments.push({ chinese, pinyin, english, note });
                     }
-                } else {
-                    i += 3; // Terminal word element boundary reached
                 }
-
-                // Clean line break artifacts out of variables
-                chinese = chinese.replace(/[\r\n]+/g, " ").trim();
-                pinyin = pinyin.replace(/[\r\n]+/g, " ").trim();
-                english = english.replace(/[\r\n]+/g, " ").trim();
-                note = note.replace(/[\r\n]+/g, " ").trim();
-
-                if (chinese) {
-                    dataSegments.push({ chinese, pinyin, english, note });
-                }
-            }
+            });
 
             if (dataSegments.length === 0) {
                 alert("Error: The text format couldn't be automatically extracted. Please check your data contains '|' dividers.");
@@ -348,9 +322,10 @@
                 let displayEnglish = data.english === "—" ? "Not directly translated" : data.english;
                 let displayNote = data.note === "—" ? "" : data.note;
 
-                // Strip quotes around translation text if present in prompt feed strings
+                // Strip curly quotes commonly provided around translation text blocks
                 displayEnglish = displayEnglish.replace(/^["“'‘]|["”'’]$/g, '');
 
+                // Note filtering rules logic check
                 const cleanNoteCheck = displayNote.toLowerCase().replace(/[\s\.]/g, '');
                 const hasValidNote = (displayNote !== "" && cleanNoteCheck !== "directmatch" && cleanNoteCheck !== "punctuation");
 
